@@ -8,18 +8,9 @@ import numpy as np
 from pymodaq_plugins_mock.hardware.wrapper import ActuatorWrapperWithTauMultiAxes
 
 
-class BeamSteeringActuators(ActuatorWrapperWithTauMultiAxes):
-    axes = ['M1tx', 'M1ty', 'M2tx', 'M2ty']
-    units = ['', '', '', '']
-    _units = units
-    _epsilon = 0.1
-    _tau = 0.01  # s
 
+class IniBeam:
     def __init__(self):
-        super().__init__()
-
-        self._current_values = [0., 0., 0., 0.]
-
         self._theta_in_x = 0.
         self._theta_in_y = 0.
 
@@ -61,6 +52,53 @@ class BeamSteeringActuators(ActuatorWrapperWithTauMultiAxes):
     @theta_in_y.setter
     def theta_in_y(self, theta_in_y: float):
         self._theta_in_y = theta_in_y
+
+class Setup():
+    def __init__(self):
+        # The lengths based on measured values
+        self.L_0 = 70
+        self.L_MM = 50
+        self.L_BS = 80
+        self.L_1 = 60
+        self.L_2 = 170
+
+class Matrix(): #Refaire
+    def __init__(self, setup: Setup):
+        # Propagating matrices
+        # Without mirrors
+        self.mat_0 = [[1, 0, setup.L_0, 0], [0, 0, 1, 0]]
+        self.mat_MM = [[1, 0, setup.L_MM, 0], [0, 0, 1, 0]]
+        self.mat_BS = [[1, 0, setup.L_BS, 0], [0, 0, 1, 0]]
+        self.mat_C1 = [[1, 0, setup.L_1, 0], [0, 0, 1, 0]]
+        self.mat_C2 = [[1, 0, setup.L_2, 0], [0, 0, 1, 0]]
+
+        # Mirror effects
+        self.mat_M = 2 * [[-setup.L_0, 0, -setup.L_MM - setup.L_0, 0], [0, -setup.L_0, 0, -setup.L_MM - setup.L_0]]
+        #WARNING:
+
+        """ 
+        self.matInit1 = [[1, 0, setup.L_0 + setup.L_MM + setup.L_BS + setup.L_1, 0],
+                   [0, 1, 0, setup.L_0 + setup.L_MM + setup.L_BS + setup.L_1]]
+        self.matInit2 = [[1, 0, setup.L_0 + setup.L_MM + setup.L_BS + setup.L_2, 0],
+                    [0, 1, 0, setup.L_0 + setup.L_MM + setup.L_BS + setup.L_2]]
+
+        self.matSetup1 = [[setup.L_MM + setup.L_BS + setup.L_1, 0, setup.L_BS + setup.L_1, 0],
+                    [0, setup.L_MM + setup.L_BS + setup.L_1, 0, setup.L_BS + setup.L_1]]
+        self.matSetup2 = [[setup.L_MM + setup.L_BS + setup.L_2, 0, setup.L_BS + setup.L_2, 0],
+                     [0, setup.L_MM + setup.L_BS + setup.L_2, 0, setup.L_BS + setup.L_2]]
+        """
+
+class BeamSteeringActuators(ActuatorWrapperWithTauMultiAxes):
+    axes = ['M1tx', 'M1ty', 'M2tx', 'M2ty']
+    units = ['', '', '', '']
+    _units = units
+    _epsilon = 0.1
+    _tau = 0.01  # s
+
+    def __init__(self):
+        super().__init__()
+
+        self._current_values = [0., 0., 0., 0.]
 
 
 class Camera:
@@ -105,33 +143,42 @@ class Camera:
     def n(self, new_n: int):
         self._n = new_n
 
-    def get_data(self, beam_controller: BeamSteeringActuators) -> np.ndarray:
-        """ to be reimplemented with real matrix propagator
-
+    def get_data(self, beam_controller: BeamSteeringActuators,
+                 ini_beam: IniBeam, setup: Setup) -> np.ndarray:
+        """
+         to be reimplemented with real matrix propagator
         """
         raise NotImplementedError
 
 
 class Camera1(Camera):
 
+    def get_data(self, beam_controller: BeamSteeringActuators,
+                 ini_beam: IniBeam, setup: Setup) -> np.ndarray:
+        mat = Matrix(setup)
+        input = [ini_beam.delta_x, ini_beam.delta_y, ini_beam.theta_in_x, ini_beam.theta_in_y] #Can we make it more compact?
 
-    def get_data(self, beam_controller: BeamSteeringActuators) -> np.ndarray:
-        ...
-        return self._image
+        image = np.dot(mat.matInit1, input) + np.dot(mat.matSetup1, ...) #Need setup-vector
+        return image
 
 
 class Camera2(Camera):
 
-    def get_data(self, beam_controller: BeamSteeringActuators) -> np.ndarray:
-        ...
-        return self._image
+    def get_data(self, beam_controller: BeamSteeringActuators,
+                 ini_beam: IniBeam, setup: Setup) -> np.ndarray:
+        mat = Matrix(setup)
+        input = [ini_beam.delta_x, ini_beam.delta_y, ini_beam.theta_in_x, ini_beam.theta_in_y]
+
+        image = np.dot(mat.matInit2, input) + np.dot(mat.matSetup2, ...)
+        return image
 
 
 class BeamSteering:
     _tau = BeamSteeringActuators._tau
 
     def __init__(self):
-
+        self.ini_beam = IniBeam()
+        self.setup = Setup()
         self.actuators = BeamSteeringActuators()
         self.cameras = [Camera1(), Camera2()]
         for cam in self.cameras:
@@ -177,5 +224,7 @@ class BeamSteering:
         return self.actuators.get_value(axis)
 
     def get_camera_data(self, index: int) -> np.ndarray:
-        return self.cameras[index].get_data(self.actuators)
+        return self.cameras[index].get_data(self.actuators,
+                                            self.ini_beam,
+                                            self.setup)
 
