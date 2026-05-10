@@ -65,6 +65,7 @@ class Setup():
 class Matrix(): #Refaire
     def __init__(self, setup: Setup):
         # Propagating matrices
+        """
         # Without mirrors
         self.mat_0 = [[1, 0, setup.L_0, 0], [0, 0, 1, 0]]
         self.mat_MM = [[1, 0, setup.L_MM, 0], [0, 0, 1, 0]]
@@ -75,8 +76,8 @@ class Matrix(): #Refaire
         # Mirror effects
         self.mat_M = 2 * [[-setup.L_0, 0, -setup.L_MM - setup.L_0, 0], [0, -setup.L_0, 0, -setup.L_MM - setup.L_0]]
         #WARNING:
+        """
 
-        """ 
         self.matInit1 = [[1, 0, setup.L_0 + setup.L_MM + setup.L_BS + setup.L_1, 0],
                    [0, 1, 0, setup.L_0 + setup.L_MM + setup.L_BS + setup.L_1]]
         self.matInit2 = [[1, 0, setup.L_0 + setup.L_MM + setup.L_BS + setup.L_2, 0],
@@ -86,7 +87,6 @@ class Matrix(): #Refaire
                     [0, setup.L_MM + setup.L_BS + setup.L_1, 0, setup.L_BS + setup.L_1]]
         self.matSetup2 = [[setup.L_MM + setup.L_BS + setup.L_2, 0, setup.L_BS + setup.L_2, 0],
                      [0, setup.L_MM + setup.L_BS + setup.L_2, 0, setup.L_BS + setup.L_2]]
-        """
 
 class BeamSteeringActuators(ActuatorWrapperWithTauMultiAxes):
     axes = ['M1tx', 'M1ty', 'M2tx', 'M2ty']
@@ -157,8 +157,9 @@ class Camera1(Camera):
                  ini_beam: IniBeam, setup: Setup) -> np.ndarray:
         mat = Matrix(setup)
         input = [ini_beam.delta_x, ini_beam.delta_y, ini_beam.theta_in_x, ini_beam.theta_in_y] #Can we make it more compact?
+        mirror_angles = [setup.get_value(axis for axis in setup.axes)]
 
-        image = np.dot(mat.matInit1, input) + np.dot(mat.matSetup1, ...) #Need setup-vector
+        image = np.dot(mat.matInit1, input) + np.dot(mat.matSetup1, mirror_angles)
         return image
 
 
@@ -168,8 +169,9 @@ class Camera2(Camera):
                  ini_beam: IniBeam, setup: Setup) -> np.ndarray:
         mat = Matrix(setup)
         input = [ini_beam.delta_x, ini_beam.delta_y, ini_beam.theta_in_x, ini_beam.theta_in_y]
+        mirror_angles = [setup.get_value(axis for axis in setup.axes)]
 
-        image = np.dot(mat.matInit2, input) + np.dot(mat.matSetup2, ...)
+        image = np.dot(mat.matInit2, input) + np.dot(mat.matSetup2, mirror_angles)
         return image
 
 
