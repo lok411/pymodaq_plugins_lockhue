@@ -7,11 +7,12 @@ Created the 24/10/2022
 import numpy as np
 from pymodaq_plugins_mock.hardware.wrapper import ActuatorWrapperWithTauMultiAxes
 
+from pymodaq_utils.math_utils import gauss2D
 
 
 class IniBeam:
     def __init__(self):
-        self._theta_in_x = 0.
+        self._theta_in_x = 10. #Value 1 for testing
         self._theta_in_y = 0.
 
         self._delta_x = 0.
@@ -53,16 +54,16 @@ class IniBeam:
     def theta_in_y(self, theta_in_y: float):
         self._theta_in_y = theta_in_y
 
-class Setup():
+class Setup:
     def __init__(self):
-        # The lengths based on measured values
+        # The lengths based on measured values (in mm)
         self.L_0 = 70
         self.L_MM = 50
         self.L_BS = 80
-        self.L_1 = 60
+        self.L_1 = 60 #L_tot_a_C1 = 260
         self.L_2 = 170
 
-class Matrix(): #Refaire
+class Matrix:
     def __init__(self, setup: Setup):
         # Propagating matrices
         """
@@ -112,12 +113,13 @@ class Camera:
     _n = 1
     _angle = 0
     amp_noise = 1
+    pixel_size_um = 8 #Size of a pixel in µm
 
     def __init__(self):
         super().__init__()
         self._image: np.ndarray = None
-        self.x_axis = np.linspace(0, self.Nx, self.Nx, endpoint=False) - self.Nx / 2
-        self.y_axis = np.linspace(0, self.Ny, self.Ny, endpoint=False) - self.Ny / 2
+        self.x_axis = (np.linspace(0, self.Nx, self.Nx, endpoint=False) - self.Nx / 2) * self.pixel_size_um
+        self.y_axis = (np.linspace(0, self.Ny, self.Ny, endpoint=False) - self.Ny / 2) * self.pixel_size_um
 
     @property
     def dx(self):
@@ -150,6 +152,11 @@ class Camera:
         """
         raise NotImplementedError
 
+    def compute_image_from_center(self, center: np.ndarray):
+        image = gauss2D(self.x_axis, center[0] / 1000, self.dx * self.pixel_size_um,
+                        self.y_axis, center[1] / 1000, self.dy * self.pixel_size_um)
+        return image
+
 
 class Camera1(Camera):
 
@@ -157,11 +164,18 @@ class Camera1(Camera):
                  ini_beam: IniBeam, setup: Setup) -> np.ndarray:
         mat = Matrix(setup)
         input = [ini_beam.delta_x, ini_beam.delta_y, ini_beam.theta_in_x, ini_beam.theta_in_y] #Can we make it more compact?
-        mirror_angles = [setup.get_value(axis for axis in setup.axes)]
+        mirror_angles = [beam_controller.get_value(axis) for axis in beam_controller.axes]
 
-        image = np.dot(mat.matInit1, input) + np.dot(mat.matSetup1, mirror_angles)
-        return image
+        center = np.dot(mat.matInit1, input) + np.dot(mat.matSetup1, mirror_angles)
+        return self.compute_image_from_center(center)
 
+"""Tester
+camera1 = Camera1()
+beam_controller = BeamSteeringActuators()
+ini_beam = IniBeam()
+setup = Setup()
+data_cam1 = camera1.get_data(beam_controller, ini_beam, setup)
+"""
 
 class Camera2(Camera):
 
@@ -169,10 +183,10 @@ class Camera2(Camera):
                  ini_beam: IniBeam, setup: Setup) -> np.ndarray:
         mat = Matrix(setup)
         input = [ini_beam.delta_x, ini_beam.delta_y, ini_beam.theta_in_x, ini_beam.theta_in_y]
-        mirror_angles = [setup.get_value(axis for axis in setup.axes)]
+        mirror_angles = [beam_controller.get_value(axis) for axis in beam_controller.axes]
 
-        image = np.dot(mat.matInit2, input) + np.dot(mat.matSetup2, mirror_angles)
-        return image
+        center = np.dot(mat.matInit2, input) + np.dot(mat.matSetup2, mirror_angles)
+        return self.compute_image_from_center(center)
 
 
 class BeamSteering:

@@ -47,8 +47,8 @@ class DAQ_2DViewer_BSDoubleCamera(DAQ_Viewer_base):
 
     def ini_detector(self, controller=None):
         self.ini_detector_init(controller, BeamSteering())
-        self.x_axis = Axis(data=self.camera.x_axis, label='pixel', index=1)
-        self.y_axis = Axis(data=self.camera.y_axis, label='pixel', index=0)
+        self.x_axis = Axis(data=self.camera.x_axis, label='xaxis', units='um', index=1)
+        self.y_axis = Axis(data=self.camera.y_axis, label='yaxis', units='um', index=0)
 
         initialized = True
         info = 'Controller ok'
@@ -90,10 +90,10 @@ class DAQ_2DViewer_BSDoubleCamera(DAQ_Viewer_base):
             data_tmp += self.controller.get_camera_data(self.settings['camera_index'])
         data_tmp = data_tmp / Naverage
 
-        dwa = DataFromPlugins(name='BSCamera', data=[data_tmp],
-                              axes=[self.x_axis, self.y_axis])
+        dwa = DataFromPlugins(name='BSDoubleCamera', data=[data_tmp],
+                              axes=[self.x_axis, self.y_axis]) #We've changed the name from BSCamera into BSDoubleCamera
 
-        return DataToExport('BSCamera', data=[dwa])
+        return DataToExport('BSDoubleCamera', data=[dwa]) #Same as above
 
     def stop(self):
         """
